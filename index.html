@@ -55,10 +55,14 @@
         let isJumping = false;       // Limite à un seul saut
         let currentPlatform = null;  // Suivre la plateforme courante
         const fixedPlatformHeight = 100; // Hauteur fixe où la plateforme courante doit rester
-
+    
         // Keyboard controls
         let keys = { left: false, right: false, space: false };
         document.addEventListener('keydown', (e) => {
+            if (gameOver && e.code === 'KeyR') {
+                restartGame();
+                return;
+            }
             if (gameOver) return;
             if (e.code === 'Space' && playerY >= 0 && !isJumping && !keys.space) {
                 keys.space = true; // Commence à charger le saut
@@ -67,7 +71,7 @@
             if (e.code === 'ArrowLeft') keys.left = true;
             if (e.code === 'ArrowRight') keys.right = true;
         });
-
+    
         document.addEventListener('keyup', (e) => {
             if (e.code === 'Space' && keys.space) {
                 keys.space = false;
@@ -81,12 +85,25 @@
             if (e.code === 'ArrowLeft') keys.left = false;
             if (e.code === 'ArrowRight') keys.right = false;
         });
-
-        // Create a platform
-        function createPlatform(yPos) {
+    
+        // Créer une plateforme avec un écart atteignable
+        function createPlatform(yPos = null) {
             const platform = document.createElement('div');
             platform.classList.add('platform');
             platform.style.left = Math.random() * (400 - 100) + 'px';
+
+            if (yPos === null && platforms.length > 0) {
+                // Trouver la plateforme la plus haute
+                const highestPlatform = platforms.reduce((max, p) => p.y > max.y ? p : max);
+                // Générer une hauteur atteignable (entre 50 et 225 pixels au-dessus)
+                const maxJumpHeight = 225;
+                const minSpacing = 50; // Écart minimum pour éviter des plateformes trop proches
+                const randomHeight = minSpacing + Math.random() * (maxJumpHeight - minSpacing);
+                yPos = highestPlatform.y + randomHeight;
+            } else if (yPos === null) {
+                yPos = 100; // Position initiale si aucune plateforme n'existe
+            }
+
             platform.style.bottom = yPos + 'px';
             gameContainer.appendChild(platform);
             platforms.push({
@@ -95,8 +112,7 @@
                 x: parseFloat(platform.style.left)
             });
         }
-
-        // Check collision and handle landing/falling
+    
         function checkCollisions() {
             const playerRect = player.getBoundingClientRect();
             let landed = false;
@@ -113,39 +129,54 @@
                     playerY = platform.y + 20;
                     velocity = 0;
                     landed = true;
-                    isJumping = false; // Réinitialise quand le joueur atterrit
-                    currentPlatform = platform; // Mémorise la plateforme courante
+                    isJumping = false;
+                    currentPlatform = platform;
                 }
             });
 
             if (landed && currentPlatform) {
                 // Calculer le décalage pour ramener la plateforme courante à fixedPlatformHeight
                 const offset = currentPlatform.y - fixedPlatformHeight;
+                const scrollSpeed = 2;
+
                 platforms.forEach(platform => {
-                    platform.y -= offset; // Ajuster toutes les plateformes
-                    platform.element.style.bottom = platform.y + 'px';
-                    if (platform.y < -20) {
-                        platform.element.remove();
-                        platforms = platforms.filter(p => p.y >= -20);
-                    }
+                    const targetY = platform.y - offset;
+                    const animatePlatform = () => {
+                        if (Math.abs(platform.y - targetY) > 1) {
+                            platform.y -= scrollSpeed;
+                            platform.element.style.bottom = platform.y + 'px';
+                            
+                            // Si c'est la plateforme courante, faire descendre le joueur avec elle
+                            if (platform === currentPlatform) {
+                                playerY -= scrollSpeed; // Le joueur descend à la même vitesse
+                                player.style.bottom = playerY + 'px';
+                            }
+                            requestAnimationFrame(animatePlatform);
+                        } else {
+                            platform.y = targetY;
+                            platform.element.style.bottom = platform.y + 'px';
+                            if (platform === currentPlatform) {
+                                playerY = targetY + 20; // Position finale après animation
+                                player.style.bottom = playerY + 'px';
+                            }
+                        }
+                    };
+                    animatePlatform();
                 });
-                // Ajuster la position du joueur pour qu'il reste sur la plateforme
-                playerY = fixedPlatformHeight + 20;
-                player.style.bottom = playerY + 'px';
 
                 // Ajouter une nouvelle plateforme si nécessaire
                 if (platforms.every(p => p.y < 500)) {
-                    createPlatform(600);
+                    createPlatform();
                 }
             }
 
             if (playerY <= 0 && !landed) {
                 if (platforms.some(p => p.y <= 0)) {
                     gameOver = true;
-                    alert('Game Over! Refresh to restart.');
+                    alert('Game Over! Press "R" to restart.');
                 } else {
-                    isJumping = false; // Réinitialise quand le joueur touche le sol
-                    currentPlatform = null; // Plus sur une plateforme
+                    isJumping = false;
+                    currentPlatform = null;
                 }
             }
         }
@@ -153,7 +184,7 @@
         // Main game loop
         function update() {
             if (gameOver) return;
-
+    
             // Horizontal movement
             if (keys.left && playerX > 0) {
                 playerX -= moveSpeed;
@@ -162,7 +193,7 @@
                 playerX += moveSpeed;
             }
             player.style.left = playerX + 'px';
-
+    
             // Vérifier si le joueur est toujours sur la plateforme courante
             if (currentPlatform) {
                 const platX = currentPlatform.x;
@@ -172,7 +203,7 @@
                     currentPlatform = null; // Le joueur tombe s'il dépasse les bords
                 }
             }
-
+    
             // Vertical movement and jump charging
             if (keys.space && !isJumping && playerY >= 0) {
                 jumpCharge += chargeRate; // Accumule la force
@@ -180,7 +211,7 @@
                     jumpCharge = maxJumpStrength; // Limite au maximum
                 }
             }
-
+    
             // Appliquer la gravité seulement si pas sur une plateforme
             if (!currentPlatform) {
                 velocity -= gravity;
@@ -191,15 +222,32 @@
                 }
                 player.style.bottom = playerY + 'px';
             }
-
+    
             checkCollisions();
             requestAnimationFrame(update);
         }
-
-        // Initialize platforms
-        createPlatform(100); // Starting platform
-        createPlatform(250);
-        createPlatform(400);
+    
+        // Modifier l'initialisation et la logique de nouvelle plateforme dans checkCollisions
+        function restartGame() {
+            playerX = 180;
+            playerY = 0;
+            velocity = 0;
+            jumpCharge = 0;
+            isJumping = false;
+            currentPlatform = null;
+            gameOver = false;
+            platforms.forEach(platform => platform.element.remove());
+            platforms = [];
+            createPlatform(100); // Plateforme de départ
+            createPlatform();   // Plateforme suivante atteignable
+            createPlatform();   // Une troisième atteignable
+            update();
+        }
+    
+        // Initialisation au démarrage
+        for (let i = 0; i < 4; i++) {
+            createPlatform(i === 0 ? 100 : null); // La première plateforme à 100, les autres aléatoires
+        }
 
         update(); // Start the game loop
     </script>
