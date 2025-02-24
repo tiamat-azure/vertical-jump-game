@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vertical Jump Game with Movement</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #87CEEB; 
+        }
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            margin: 0 auto;
+            background: #f0f0f0;
+            border: 2px solid #333;
+            overflow: hidden;
+        }
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: #FF4500; /* Orange player */
+            left: 180px;
+            bottom: 0;
+        }
+        .platform {
+            position: absolute;
+            width: 100px;
+            height: 20px;
+            background: #228B22; /* Green platforms */
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="player"></div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        let playerX = 180; // Horizontal position
+        let playerY = 0;   // Vertical position
+        let velocity = 0;
+        const gravity = 0.5;
+        const minJumpStrength = 10;   // 50% de l'ancien saut (12)
+        const maxJumpStrength = 15;  // 150% de l'ancien saut (12)
+        const chargeRate = 0.2;      // Vitesse d'accumulation de la force par frame
+        let jumpCharge = 0;          // Force accumulée pendant le maintien
+        const moveSpeed = 5;         // Speed of left/right movement
+        let platforms = [];
+        let gameOver = false;
+        let isJumping = false;       // Limite à un seul saut
+        let currentPlatform = null;  // Suivre la plateforme courante
+        const fixedPlatformHeight = 100; // Hauteur fixe où la plateforme courante doit rester
+
+        // Keyboard controls
+        let keys = { left: false, right: false, space: false };
+        document.addEventListener('keydown', (e) => {
+            if (gameOver) return;
+            if (e.code === 'Space' && playerY >= 0 && !isJumping && !keys.space) {
+                keys.space = true; // Commence à charger le saut
+                jumpCharge = minJumpStrength; // Initialise au minimum
+            }
+            if (e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'ArrowRight') keys.right = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' && keys.space) {
+                keys.space = false;
+                if (playerY >= 0 && !isJumping) {
+                    velocity = jumpCharge; // Applique la force accumulée
+                    isJumping = true;
+                    currentPlatform = null; // Quitte la plateforme lors du saut
+                }
+                jumpCharge = 0; // Réinitialise la charge
+            }
+            if (e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'ArrowRight') keys.right = false;
+        });
+
+        // Create a platform
+        function createPlatform(yPos) {
+            const platform = document.createElement('div');
+            platform.classList.add('platform');
+            platform.style.left = Math.random() * (400 - 100) + 'px';
+            platform.style.bottom = yPos + 'px';
+            gameContainer.appendChild(platform);
+            platforms.push({
+                element: platform,
+                y: yPos,
+                x: parseFloat(platform.style.left)
+            });
+        }
+
+        // Check collision and handle landing/falling
+        function checkCollisions() {
+            const playerRect = player.getBoundingClientRect();
+            let landed = false;
+
+            platforms.forEach(platform => {
+                const platRect = platform.element.getBoundingClientRect();
+                if (
+                    playerRect.bottom > platRect.top &&
+                    playerRect.top < platRect.bottom &&
+                    playerRect.right > platRect.left &&
+                    playerRect.left < platRect.right &&
+                    velocity < 0 // When falling
+                ) {
+                    playerY = platform.y + 20;
+                    velocity = 0;
+                    landed = true;
+                    isJumping = false; // Réinitialise quand le joueur atterrit
+                    currentPlatform = platform; // Mémorise la plateforme courante
+                }
+            });
+
+            if (landed && currentPlatform) {
+                // Calculer le décalage pour ramener la plateforme courante à fixedPlatformHeight
+                const offset = currentPlatform.y - fixedPlatformHeight;
+                platforms.forEach(platform => {
+                    platform.y -= offset; // Ajuster toutes les plateformes
+                    platform.element.style.bottom = platform.y + 'px';
+                    if (platform.y < -20) {
+                        platform.element.remove();
+                        platforms = platforms.filter(p => p.y >= -20);
+                    }
+                });
+                // Ajuster la position du joueur pour qu'il reste sur la plateforme
+                playerY = fixedPlatformHeight + 20;
+                player.style.bottom = playerY + 'px';
+
+                // Ajouter une nouvelle plateforme si nécessaire
+                if (platforms.every(p => p.y < 500)) {
+                    createPlatform(600);
+                }
+            }
+
+            if (playerY <= 0 && !landed) {
+                if (platforms.some(p => p.y <= 0)) {
+                    gameOver = true;
+                    alert('Game Over! Refresh to restart.');
+                } else {
+                    isJumping = false; // Réinitialise quand le joueur touche le sol
+                    currentPlatform = null; // Plus sur une plateforme
+                }
+            }
+        }
+
+        // Main game loop
+        function update() {
+            if (gameOver) return;
+
+            // Horizontal movement
+            if (keys.left && playerX > 0) {
+                playerX -= moveSpeed;
+            }
+            if (keys.right && playerX < 400 - 40) {
+                playerX += moveSpeed;
+            }
+            player.style.left = playerX + 'px';
+
+            // Vérifier si le joueur est toujours sur la plateforme courante
+            if (currentPlatform) {
+                const platX = currentPlatform.x;
+                const platWidth = 100; // Largeur de la plateforme
+                const playerWidth = 40; // Largeur du joueur
+                if (playerX + playerWidth < platX || playerX > platX + platWidth) {
+                    currentPlatform = null; // Le joueur tombe s'il dépasse les bords
+                }
+            }
+
+            // Vertical movement and jump charging
+            if (keys.space && !isJumping && playerY >= 0) {
+                jumpCharge += chargeRate; // Accumule la force
+                if (jumpCharge > maxJumpStrength) {
+                    jumpCharge = maxJumpStrength; // Limite au maximum
+                }
+            }
+
+            // Appliquer la gravité seulement si pas sur une plateforme
+            if (!currentPlatform) {
+                velocity -= gravity;
+                playerY += velocity;
+                if (playerY <= 0) {
+                    playerY = 0;
+                    velocity = 0;
+                }
+                player.style.bottom = playerY + 'px';
+            }
+
+            checkCollisions();
+            requestAnimationFrame(update);
+        }
+
+        // Initialize platforms
+        createPlatform(100); // Starting platform
+        createPlatform(250);
+        createPlatform(400);
+
+        update(); // Start the game loop
+    </script>
+</body>
+</html>
