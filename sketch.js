@@ -7,11 +7,16 @@ let score = 0;
 let gameOver = false;
 
 // Paramètres configurables
-const SCROLL_SPEED = 4; // Vitesse de défilement initiale
+const SCROLL_SPEED = 4;
 const INITIAL_PLATFORMS = 6;
-const SHAKE_THRESHOLD = 12; // 10 (min) + 20%
-const TARGET_HEIGHT = 450; // Hauteur cible pour le joueur au repos
-const MIN_PLATFORM_SPACING = 150; // Espacement minimal pour empêcher 3 sauts consécutifs
+const SHAKE_THRESHOLD = 12;
+const TARGET_HEIGHT = 450;
+const MIN_PLATFORM_SPACING = 150;
+// Nouveaux paramètres pour l'animation
+const INITIAL_HEIGHT = 40;
+const INITIAL_WIDTH = 30;
+const MIN_SQUASH = 0.5; // 50% de la hauteur initiale
+const MAX_STRETCH = 1.5; // 150% de la hauteur initiale
 
 function setup() {
   createCanvas(400, 600);
@@ -19,33 +24,24 @@ function setup() {
 }
 
 function draw() {
-  // Fond gris clair
   background(220);
   
   if (!gameOver) {
-    // Mise à jour du joueur
     updatePlayer();
-    
-    // Gestion des collisions
     checkCollisions();
     
-    // Défilement pendant la phase ascendante
     if (player.velocity < 0) {
-      scrollPlatforms(SCROLL_SPEED); // Défilement normal en saut
+      scrollPlatforms(SCROLL_SPEED);
       player.rotation += map(abs(player.lastJumpForce), 10, 15, 0.2, 0.5);
     } else {
-      player.rotation = 0; // Réinitialisation hors ascension
-      
-      // Défilement si sur plateforme et pas en charge
+      player.rotation = 0;
       if (player.onPlatform && !isCharging && player.y < TARGET_HEIGHT) {
-        scrollPlatforms(SCROLL_SPEED * 0.5); // Défilement plus lent au repos
+        scrollPlatforms(SCROLL_SPEED * 0.5);
       }
     }
     
-    // Affichage
     displayGame();
     
-    // Vérification game over (tombe dans le vide)
     if (player.y > height) {
       gameOver = true;
     }
@@ -53,7 +49,6 @@ function draw() {
     displayGameOver();
   }
   
-  // Affichage du score (en haut à gauche)
   fill(0);
   textSize(20);
   textAlign(LEFT);
@@ -61,46 +56,59 @@ function draw() {
 }
 
 function updatePlayer() {
-  // Mouvement horizontal
   if (keyIsDown(LEFT_ARROW)) player.x -= 5;
   if (keyIsDown(RIGHT_ARROW)) player.x += 5;
+  player.x = constrain(player.x, 0, width - player.currentW);
   
-  // Limites horizontales
-  player.x = constrain(player.x, 0, width - player.w);
-  
-  // Gravité
   player.velocity += gravity;
   player.y += player.velocity;
   
-  // Charge du saut
+  // Animation du squash pendant la charge
   if (isCharging) {
     jumpCharge = constrain(jumpCharge + 0.2, 10, 15);
+    let squashFactor = map(jumpCharge, 0, 15, 1, MIN_SQUASH);
+    player.currentH = INITIAL_HEIGHT * squashFactor;
+    player.currentW = INITIAL_WIDTH / squashFactor; // Conservation du volume
     if (jumpCharge > SHAKE_THRESHOLD) {
       player.shakeOffset = random(-map(jumpCharge, SHAKE_THRESHOLD, 15, 1, 5), 
                                  map(jumpCharge, SHAKE_THRESHOLD, 15, 1, 5));
     } else {
       player.shakeOffset = 0;
     }
+  } 
+  // Animation du stretch pendant le saut
+  else if (!player.onPlatform) {
+    if (player.velocity < 0) { // Phase ascendante
+      let stretchFactor = map(abs(player.velocity), 0, 15, 1, MAX_STRETCH);
+      player.currentH = INITIAL_HEIGHT * stretchFactor;
+      player.currentW = INITIAL_WIDTH / stretchFactor;
+    } else { // Phase descendante
+      let recoveryFactor = map(player.velocity, 0, 15, 1, MAX_STRETCH);
+      player.currentH = INITIAL_HEIGHT * recoveryFactor;
+      player.currentW = INITIAL_WIDTH / recoveryFactor;
+    }
+  }
+  // Retour à la normale sur une plateforme
+  else if (!isCharging) {
+    player.currentH += (INITIAL_HEIGHT - player.currentH) * 0.1; // Interpolation douce
+    player.currentW += (INITIAL_WIDTH - player.currentW) * 0.1;
   }
   
-  // Réinitialisation état plateforme
   player.onPlatform = false;
 }
 
 function displayGame() {
-  // Affichage des plateformes
   for (let p of platforms) {
     fill(0, 255, 0);
     rect(p.x, p.y, p.w, p.h);
   }
   
-  // Affichage du joueur avec rotation et tremblement
   push();
-  translate(player.x + player.w/2 + player.shakeOffset, 
-           player.y + player.h/2 + player.shakeOffset);
+  translate(player.x + player.currentW/2 + player.shakeOffset, 
+           player.y + player.currentH/2 + player.shakeOffset);
   rotate(player.rotation);
   fill(255, 165, 0);
-  rect(-player.w/2, -player.h/2, player.w, player.h);
+  rect(-player.currentW/2, -player.currentH/2, player.currentW, player.currentH);
   pop();
 }
 
@@ -117,24 +125,23 @@ function keyReleased() {
   if (key === ' ') {
     isCharging = false;
     player.velocity = -jumpCharge;
-    player.lastJumpForce = jumpCharge; // Sauvegarde pour rotation
+    player.lastJumpForce = jumpCharge;
     jumpCharge = 0;
-    player.shakeOffset = 0; // Réinitialisation tremblement
+    player.shakeOffset = 0;
   }
 }
 
 function checkCollisions() {
   for (let p of platforms) {
-    if (player.y + player.h >= p.y && 
-        player.y + player.h <= p.y + p.h &&
-        player.x + player.w > p.x && 
+    if (player.y + player.currentH >= p.y && 
+        player.y + player.currentH <= p.y + p.h &&
+        player.x + player.currentW > p.x && 
         player.x < p.x + p.w &&
         player.velocity > 0) {
-      player.y = p.y - player.h;
+      player.y = p.y - player.currentH;
       player.velocity = 0;
       player.onPlatform = true;
       
-      // Score si nouvelle plateforme plus haute
       if (p.y < player.highestPlatform) {
         score += 1000;
         player.highestPlatform = p.y;
@@ -148,13 +155,11 @@ function scrollPlatforms(speed) {
     p.y += speed;
   }
   
-  // Supprimer les plateformes hors écran
   platforms = platforms.filter(p => p.y < height);
   
-  // Ajouter nouvelle plateforme si nécessaire
   if (platforms.length < INITIAL_PLATFORMS) {
     let lastY = platforms.length > 0 ? platforms[platforms.length-1].y : height;
-    let newY = lastY - random(MIN_PLATFORM_SPACING, 100); // Espacement pour saut max
+    let newY = lastY - random(MIN_PLATFORM_SPACING, 100);
     platforms.push({
       x: random(0, width-100),
       y: newY,
@@ -165,12 +170,13 @@ function scrollPlatforms(speed) {
 }
 
 function resetGame() {
-  // Joueur sur plateforme en bas
   player = {
     x: width/2,
-    y: height - 60, // Hauteur plateforme + joueur
-    w: 30,
-    h: 40,
+    y: height - 60,
+    w: INITIAL_WIDTH,          // Stocke la taille initiale
+    h: INITIAL_HEIGHT,
+    currentW: INITIAL_WIDTH,   // Taille actuelle pour l'animation
+    currentH: INITIAL_HEIGHT,
     velocity: 0,
     rotation: 0,
     shakeOffset: 0,
@@ -180,7 +186,6 @@ function resetGame() {
   };
   
   platforms = [];
-  // Première plateforme en bas
   platforms.push({
     x: width/2 - 50,
     y: height - 20,
@@ -188,12 +193,11 @@ function resetGame() {
     h: 20
   });
   
-  // Autres plateformes avec espacement
   for (let i = 1; i < INITIAL_PLATFORMS; i++) {
     let lastY = platforms[i-1].y;
     platforms.push({
       x: random(0, width-100),
-      y: lastY - random(MIN_PLATFORM_SPACING, 100), // Espacement minimal
+      y: lastY - random(MIN_PLATFORM_SPACING, 100),
       w: 100,
       h: 20
     });
