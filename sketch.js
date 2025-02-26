@@ -6,6 +6,7 @@ let isCharging = false;
 let score = 0;
 let gameOver = false;
 let lives = 3;
+let playerImg; // Variable to store the player image
 
 // Paramètres configurables
 const SCROLL_SPEED = 8;
@@ -30,6 +31,10 @@ const BOTTOM_MARGIN = 10; // Marge en bas de l'écran pour la plateforme la plus
 const CANVA_W = 400;
 const CANVA_H = 700;
 const CANVA_BGCOLOR = 220;
+
+function preload() {
+  playerImg = loadImage('images/guerrier.png'); // Load the player image
+}
 
 function setup() {
   createCanvas(CANVA_W, CANVA_H);
@@ -132,9 +137,8 @@ function displayGame() {
   translate(player.x + player.currentW/2 + player.shakeOffset, 
            player.y + player.currentH/2 + player.shakeOffset);
   rotate(player.rotation);
-  fill(255, 165, 0);
-  noStroke();
-  rect(-player.currentW/2, -player.currentH/2, player.currentW, player.currentH);
+  imageMode(CENTER);
+  image(playerImg, 0, 0, player.currentW, player.currentH); // Draw the player image
   pop();
 }
 
