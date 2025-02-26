@@ -5,6 +5,7 @@ let jumpCharge = 0;
 let isCharging = false;
 let score = 0;
 let gameOver = false;
+let lives = 3; // Initial number of lives
 
 // Paramètres configurables
 const SCROLL_SPEED = 6;
@@ -55,7 +56,12 @@ function draw() {
     displayGame();
     
     if (player.y > height) {
-      gameOver = true;
+      lives--;
+      if (lives > 0) {
+        repositionPlayer();
+      } else {
+        gameOver = true;
+      }
     }
   } else {
     displayGameOver();
@@ -67,6 +73,7 @@ function draw() {
   textSize(20);
   textAlign(LEFT);
   text(`Score: ${score}`, 10, 30);
+  displayLives(); // Display lives in the header
 }
 
 function updatePlayer() {
@@ -243,6 +250,7 @@ function resetGame() {
   
   score = 0;
   gameOver = false;
+  lives = 3; // Reset lives
 }
 
 function displayGameOver() {
@@ -252,4 +260,32 @@ function displayGameOver() {
   text("Game Over", width/2, height/2);
   textSize(20);
   text("Press R to restart", width/2, height/2 + 40);
+}
+
+function displayLives() {
+  const heartSize = 20;
+  for (let i = 0; i < 3; i++) {
+    if (i < lives) {
+      fill(255, 0, 0);
+    } else {
+      noFill();
+      stroke(255, 0, 0);
+    }
+    beginShape();
+    vertex(50 + i * (heartSize + 10), 20);
+    bezierVertex(50 + i * (heartSize + 10) - heartSize / 2, 20 - heartSize / 2, 
+                 50 + i * (heartSize + 10) - heartSize, 20 + heartSize / 3, 
+                 50 + i * (heartSize + 10), 20 + heartSize);
+    bezierVertex(50 + i * (heartSize + 10) + heartSize, 20 + heartSize / 3, 
+                 50 + i * (heartSize + 10) + heartSize / 2, 20 - heartSize / 2, 
+                 50 + i * (heartSize + 10), 20);
+    endShape(CLOSE);
+  }
+}
+
+function repositionPlayer() {
+  let lowestPlatform = platforms.reduce((lowest, p) => p.y > lowest.y ? p : lowest, platforms[0]);
+  player.y = lowestPlatform.y - player.currentH;
+  player.velocity = 0;
+  player.onPlatform = true;
 }
