@@ -143,7 +143,7 @@ function displayGame() {
 }
 
 function keyPressed() {
-  if (key === ' ' && player.canJump) { // Vérifie si le joueur peut sauter
+  if (key === ' ' && player.onPlatform) { // Vérifie si le joueur est sur une plateforme
     isCharging = true;
     player.canJump = false; // Désactive le saut jusqu'à l'atterrissage
   }
@@ -176,11 +176,7 @@ function checkCollisions() {
       player.velocity = 0;
       player.onPlatform = true;
       player.canJump = true; // Réactive la possibilité de sauter
-      
-      if (p.y < player.highestPlatform) {
-        score += 1000;
-        player.highestPlatform = p.y;
-      }
+
     }
   }
 }
@@ -206,8 +202,13 @@ function scrollPlatforms(targetSpeed) {
     }
   }
   
+  // Filtrer les plateformes et incrémenter le score pour celles qui sortent
+  let initialLength = platforms.length;
   platforms = platforms.filter(p => p.y < height);
-  
+  if (platforms.length < initialLength) {
+    score += 1000 * (initialLength - platforms.length); // Incrémente de 1000 par plateforme sortie
+  }
+
   if (platforms.length < INITIAL_PLATFORMS) {
     let lastY = platforms.length > 0 ? platforms[platforms.length-1].y : height;
     let newY = lastY - random(100, 150);
