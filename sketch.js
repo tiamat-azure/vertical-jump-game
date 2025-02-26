@@ -60,9 +60,9 @@ let menuCurrentX = CANVA_W;
 let menuSelectedIndex = 0;
 
 function preload() {
-  heroImages[0] = { name: "Lysaria", img: loadImage('images/hero-1.png') };
-  heroImages[1] = { name: "Kaelrik", img: loadImage('images/hero-2.png') };
-  heroImages[2] = { name: "Seraphine", img: loadImage('images/hero-3.png') };
+  heroImages[0] = { name: "Lysaria", img: loadImage('images/heroes/hero-1.png') };
+  heroImages[1] = { name: "Kaelrik", img: loadImage('images/heroes/hero-2.png') };
+  heroImages[2] = { name: "Seraphine", img: loadImage('images/heroes/hero-3.png') };
   playerImg = heroImages[selectedHeroIndex].img;
 }
 
@@ -381,13 +381,13 @@ function drawMenu() {
     textAlign(CENTER);
     text("Choose Hero", menuCurrentX + 75, 30);
     
-    const itemHeight = 80;
+    const itemHeight = 100; // Increase item height to avoid overlap
     for (let i = 0; i < 3; i++) {
       let y = 70 + i * itemHeight;
       
       if (i === menuSelectedIndex) {
-        fill(255, 215, 0);
-        rect(menuCurrentX + 10, y - 10, 130, 70, 5);
+        fill(100, 149, 237); // Cornflower blue for a less contrasting selection color
+        rect(menuCurrentX + 10, y - 10, 130, 90, 5); // Enlarge the selection to encompass both the illustration and the name
       }
       
       imageMode(CENTER);
@@ -400,7 +400,7 @@ function drawMenu() {
       
       fill(255);
       textSize(16);
-      text(heroImages[i].name, menuCurrentX + 75, y + 60);
+      text(heroImages[i].name, menuCurrentX + 75, y + 70); // Add some pixels between the name and the illustration
     }
   }
 }
