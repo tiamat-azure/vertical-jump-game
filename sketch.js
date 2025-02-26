@@ -13,9 +13,9 @@ const SHAKE_THRESHOLD = 12;
 const TARGET_HEIGHT = 450;
 const MIN_PLATFORM_SPACING = 150;
 // Paramètres pour l'animation
-const INITIAL_SIZE = 30; // Taille initiale carrée
-const MIN_SQUASH = 0.5; // Hauteur minimale en proportion
-const MAX_SQUASH_WIDTH = 1.8; // Nouvelle constante : largeur max en proportion de INITIAL_SIZE
+const INITIAL_SIZE = 30;
+const MIN_SQUASH = 0.5;
+const MAX_SQUASH_WIDTH = 1.8;
 const MAX_STRETCH = 1.5;
 const STILL_TIME_THRESHOLD = 60;
 
@@ -34,11 +34,9 @@ function draw() {
     if (player.velocity < 0) {
       scrollPlatforms(SCROLL_SPEED);
       player.rotation += map(abs(player.lastJumpForce), 10, 15, 0.2, 0.5);
-    } else {
-      player.rotation = 0;
-      if (player.onPlatform && !isCharging && player.y < TARGET_HEIGHT) {
-        scrollPlatforms(SCROLL_SPEED * 0.5);
-      }
+    } else if (!player.onPlatform) {
+      // Continuer la rotation en descente, mais plus lentement
+      player.rotation += map(abs(player.lastJumpForce), 10, 15, 0.1, 0.25);
     }
     
     displayGame();
@@ -61,13 +59,11 @@ function updatePlayer() {
   if (keyIsDown(RIGHT_ARROW)) player.x += 5;
   player.x = constrain(player.x, 0, width - player.currentW);
   
-  // Appliquer la gravité seulement si pas sur une plateforme
   if (!player.onPlatform || isCharging) {
     player.velocity += gravity;
     player.y += player.velocity;
   }
   
-  // Animation du squash pendant la charge
   if (isCharging) {
     jumpCharge = constrain(jumpCharge + 0.2, 10, 15);
     let squashFactor = map(jumpCharge, 0, 15, 1, MIN_SQUASH);
@@ -81,26 +77,25 @@ function updatePlayer() {
     }
     player.stillTime = 0;
   } 
-  // Animation du stretch pendant le saut
   else if (!player.onPlatform) {
-    if (player.velocity < 0) { // Phase ascendante
+    if (player.velocity < 0) {
       let stretchFactor = map(abs(player.velocity), 0, 15, 1, MAX_STRETCH);
       player.currentH = INITIAL_SIZE * stretchFactor;
       player.currentW = INITIAL_SIZE / stretchFactor;
-    } else { // Phase descendante
+    } else {
       let recoveryFactor = map(player.velocity, 0, 15, 1, MAX_STRETCH);
       player.currentH = INITIAL_SIZE * recoveryFactor;
       player.currentW = INITIAL_SIZE / recoveryFactor;
     }
     player.stillTime = 0;
   } 
-  // Retour progressif à la forme carrée quand immobile
   else if (!isCharging) {
     player.stillTime++;
     if (player.stillTime > STILL_TIME_THRESHOLD) {
       player.currentH += (INITIAL_SIZE - player.currentH) * 0.1;
       player.currentW += (INITIAL_SIZE - player.currentW) * 0.1;
     }
+    player.rotation = 0; // Réinitialisation de la rotation seulement sur plateforme
   }
   
   player.onPlatform = false;
@@ -162,7 +157,6 @@ function checkCollisions() {
 function scrollPlatforms(speed) {
   for (let p of platforms) {
     p.y += speed;
-    // Si le joueur est sur cette plateforme, le déplacer avec elle
     if (player.onPlatform && 
         player.y + player.currentH === p.y && 
         player.x + player.currentW > p.x && 
