@@ -38,7 +38,7 @@ function draw() {
       
       // Défilement si sur plateforme et pas en charge
       if (player.onPlatform && !isCharging && player.y < TARGET_HEIGHT) {
-        scrollPlatforms(SCROLL_SPEED / 2); // Défilement plus lent au repos
+        scrollPlatforms(SCROLL_SPEED * 0.5); // Défilement plus lent au repos
       }
     }
     
