@@ -7,25 +7,34 @@ let score = 0;
 let gameOver = false;
 
 // Paramètres configurables
-const SCROLL_SPEED = 4;
+const SCROLL_SPEED = 6;
 const INITIAL_PLATFORMS = 6;
 const SHAKE_THRESHOLD = 12;
 const TARGET_HEIGHT = 450;
 const MIN_PLATFORM_SPACING = 150;
+const SCROLL_SMOOTHNESS = 0.1;
+const HEADER_HEIGHT = 50;
 // Paramètres pour l'animation
-const INITIAL_SIZE = 30; // Taille initiale carrée
-const MIN_SQUASH = 0.5; // Hauteur minimale en proportion
-const MAX_SQUASH_WIDTH = 1.8; // Nouvelle constante : largeur max en proportion de INITIAL_SIZE
+const INITIAL_SIZE = 30;
+const MIN_SQUASH = 0.5;
+const MAX_SQUASH_WIDTH = 1.8;
 const MAX_STRETCH = 1.5;
 const STILL_TIME_THRESHOLD = 60;
+// Paramètres pour la rotation
+const MIN_ROTATIONS = 1; // Nombre minimum de rotations pleines
+const ROTATION_SPEED = 0.3; // Vitesse de rotation par frame (ajustable)
+
+const CANVA_W = 400;
+const CANVA_H = 700;
+const CANVA_BGCOLOR = 220;
 
 function setup() {
-  createCanvas(400, 600);
+  createCanvas(CANVA_W, CANVA_H);
   resetGame();
 }
 
 function draw() {
-  background(220);
+  background(CANVA_BGCOLOR);
   
   if (!gameOver) {
     updatePlayer();
@@ -33,10 +42,12 @@ function draw() {
     
     if (player.velocity < 0) {
       scrollPlatforms(SCROLL_SPEED);
-      player.rotation += map(abs(player.lastJumpForce), 10, 15, 0.2, 0.5);
-    } else {
+      // Rotation uniquement pendant la phase ascendante
+      player.rotation += ROTATION_SPEED;
+    } else if (player.onPlatform) {
+      // S'assurer que la rotation est un multiple de 2PI à l'atterrissage
       player.rotation = 0;
-      if (player.onPlatform && !isCharging && player.y < TARGET_HEIGHT) {
+      if (!isCharging && player.y < TARGET_HEIGHT) {
         scrollPlatforms(SCROLL_SPEED * 0.5);
       }
     }
@@ -49,8 +60,10 @@ function draw() {
   } else {
     displayGameOver();
   }
-  
-  fill(0);
+
+  fill(50, 50, 50);
+  rect(0, 0, width, HEADER_HEIGHT);
+  fill(255);
   textSize(20);
   textAlign(LEFT);
   text(`Score: ${score}`, 10, 30);
@@ -61,13 +74,11 @@ function updatePlayer() {
   if (keyIsDown(RIGHT_ARROW)) player.x += 5;
   player.x = constrain(player.x, 0, width - player.currentW);
   
-  // Appliquer la gravité seulement si pas sur une plateforme
   if (!player.onPlatform || isCharging) {
     player.velocity += gravity;
     player.y += player.velocity;
   }
   
-  // Animation du squash pendant la charge
   if (isCharging) {
     jumpCharge = constrain(jumpCharge + 0.2, 10, 15);
     let squashFactor = map(jumpCharge, 0, 15, 1, MIN_SQUASH);
@@ -81,20 +92,18 @@ function updatePlayer() {
     }
     player.stillTime = 0;
   } 
-  // Animation du stretch pendant le saut
   else if (!player.onPlatform) {
-    if (player.velocity < 0) { // Phase ascendante
+    if (player.velocity < 0) {
       let stretchFactor = map(abs(player.velocity), 0, 15, 1, MAX_STRETCH);
       player.currentH = INITIAL_SIZE * stretchFactor;
       player.currentW = INITIAL_SIZE / stretchFactor;
-    } else { // Phase descendante
+    } else {
       let recoveryFactor = map(player.velocity, 0, 15, 1, MAX_STRETCH);
       player.currentH = INITIAL_SIZE * recoveryFactor;
       player.currentW = INITIAL_SIZE / recoveryFactor;
     }
     player.stillTime = 0;
   } 
-  // Retour progressif à la forme carrée quand immobile
   else if (!isCharging) {
     player.stillTime++;
     if (player.stillTime > STILL_TIME_THRESHOLD) {
@@ -108,8 +117,10 @@ function updatePlayer() {
 
 function displayGame() {
   for (let p of platforms) {
-    fill(0, 255, 0);
-    rect(p.x, p.y, p.w, p.h);
+    if (p.y + p.h > HEADER_HEIGHT) {
+      fill(0, 255, 0);
+      rect(p.x, p.y, p.w, p.h);
+    }
   }
   
   push();
@@ -135,6 +146,9 @@ function keyReleased() {
     isCharging = false;
     player.velocity = -jumpCharge;
     player.lastJumpForce = jumpCharge;
+    // Calculer le nombre total de rotations basé sur jumpCharge
+    let rotationCount = MIN_ROTATIONS + floor(map(jumpCharge, 10, 15, 0, 2)); // 0 à 2 rotations supplémentaires
+    player.targetRotation = rotationCount * TWO_PI; // Rotation cible en radians
     jumpCharge = 0;
     player.shakeOffset = 0;
   }
@@ -143,7 +157,7 @@ function keyReleased() {
 function checkCollisions() {
   for (let p of platforms) {
     if (player.y + player.currentH >= p.y && 
-        player.y + player.currentH <= p.y + p.h &&
+        player.y + player.currentH <= p.y + p.h + 2 &&
         player.x + player.currentW > p.x && 
         player.x < p.x + p.w &&
         player.velocity > 0) {
@@ -159,15 +173,18 @@ function checkCollisions() {
   }
 }
 
-function scrollPlatforms(speed) {
+function scrollPlatforms(targetSpeed) {
   for (let p of platforms) {
-    p.y += speed;
-    // Si le joueur est sur cette plateforme, le déplacer avec elle
+    if (!p.currentSpeed) p.currentSpeed = 0;
+    
+    p.currentSpeed += (targetSpeed - p.currentSpeed) * SCROLL_SMOOTHNESS;
+    p.y += p.currentSpeed;
+    
     if (player.onPlatform && 
         player.y + player.currentH === p.y && 
         player.x + player.currentW > p.x && 
         player.x < p.x + p.w) {
-      player.y += speed;
+      player.y += p.currentSpeed;
     }
   }
   
@@ -175,12 +192,13 @@ function scrollPlatforms(speed) {
   
   if (platforms.length < INITIAL_PLATFORMS) {
     let lastY = platforms.length > 0 ? platforms[platforms.length-1].y : height;
-    let newY = lastY - random(MIN_PLATFORM_SPACING, 100);
+    let newY = lastY - random(100, 150);
     platforms.push({
       x: random(0, width-100),
       y: newY,
       w: 100,
-      h: 20
+      h: 20,
+      currentSpeed: targetSpeed
     });
   }
 }
@@ -195,6 +213,7 @@ function resetGame() {
     currentH: INITIAL_SIZE,
     velocity: 0,
     rotation: 0,
+    targetRotation: 0, // Ajout de la rotation cible
     shakeOffset: 0,
     lastJumpForce: 0,
     highestPlatform: height,
@@ -207,7 +226,8 @@ function resetGame() {
     x: width/2 - 50,
     y: height - 20,
     w: 100,
-    h: 20
+    h: 20,
+    currentSpeed: 0
   });
   
   for (let i = 1; i < INITIAL_PLATFORMS; i++) {
@@ -216,7 +236,8 @@ function resetGame() {
       x: random(0, width-100),
       y: lastY - random(MIN_PLATFORM_SPACING, 100),
       w: 100,
-      h: 20
+      h: 20,
+      currentSpeed: 0
     });
   }
   
