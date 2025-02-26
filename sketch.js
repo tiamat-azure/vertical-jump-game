@@ -33,7 +33,7 @@ const CANVA_H = 700;
 const CANVA_BGCOLOR = 220;
 
 function preload() {
-  playerImg = loadImage('images/guerrier.png'); // Load the player image
+  playerImg = loadImage('images/hero-1.png'); // Load the player image
 }
 
 function setup() {
@@ -143,7 +143,7 @@ function displayGame() {
 }
 
 function keyPressed() {
-  if (key === ' ' && player.onPlatform) { // Vérifie si le joueur est sur une plateforme
+  if (key === ' ' && player.canJump) { // Vérifie si le joueur peut sauter
     isCharging = true;
     player.canJump = false; // Désactive le saut jusqu'à l'atterrissage
   }
@@ -186,7 +186,7 @@ function scrollPlatforms(targetSpeed) {
     p.y + p.h > HEADER_HEIGHT && p.y >= (player.onPlatform ? player.y : player.y + player.currentH)
   ).length;
   
-  if (player.velocity < 0 && platformsBelow > 2) {
+  if (player.velocity < 0 && platformsBelow > 1) {
     for (let p of platforms) {
       if (!p.currentSpeed) p.currentSpeed = 0;
       
