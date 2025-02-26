@@ -172,15 +172,10 @@ function checkCollisions() {
       player.velocity = 0;
       player.onPlatform = true;
       player.canJump = true; // Réactive la possibilité de sauter
-      
-      if (p.y < player.highestPlatform) {
-        score += 1000;
-        player.highestPlatform = p.y;
-      }
+      // L'incrémentation du score est supprimée ici
     }
   }
 }
-
 function scrollPlatforms(targetSpeed) {
   let platformsBelow = platforms.filter(p => 
     p.y + p.h > HEADER_HEIGHT && p.y >= (player.onPlatform ? player.y : player.y + player.currentH)
@@ -202,7 +197,12 @@ function scrollPlatforms(targetSpeed) {
     }
   }
   
+  // Filtrer les plateformes et incrémenter le score pour celles qui sortent
+  let initialLength = platforms.length;
   platforms = platforms.filter(p => p.y < height);
+  if (platforms.length < initialLength) {
+    score += 1000 * (initialLength - platforms.length); // Incrémente de 1000 par plateforme sortie
+  }
   
   if (platforms.length < INITIAL_PLATFORMS) {
     let lastY = platforms.length > 0 ? platforms[platforms.length-1].y : height;
