@@ -1,3 +1,24 @@
+// Déplacer les constantes avant les variables globales qui en dépendent
+const CANVA_W = 400;
+const CANVA_H = 700;
+const CANVA_BGCOLOR = 220;
+
+const SCROLL_SPEED = 8;
+const INITIAL_PLATFORMS = 6;
+const SHAKE_THRESHOLD = 12;
+const TARGET_HEIGHT = 450;
+const MIN_PLATFORM_SPACING = 200;
+const SCROLL_SMOOTHNESS = 0.1;
+const HEADER_HEIGHT = 50;
+const INITIAL_SIZE = 50;
+const MIN_SQUASH = 0.5;
+const MAX_SQUASH_WIDTH = 1.8;
+const MAX_STRETCH = 1.5;
+const STILL_TIME_THRESHOLD = 60;
+const MIN_ROTATIONS = 3;
+const ROTATION_SPEED = 0.3;
+const BOTTOM_MARGIN = 10;
+
 let player;
 let platforms = [];
 let gravity = 0.5;
@@ -6,34 +27,19 @@ let isCharging = false;
 let score = 0;
 let gameOver = false;
 let lives = 3;
-let playerImg; // Variable to store the player image
-
-// Paramètres configurables
-const SCROLL_SPEED = 8;
-const INITIAL_PLATFORMS = 6;
-const SHAKE_THRESHOLD = 12;
-const TARGET_HEIGHT = 450;
-const MIN_PLATFORM_SPACING = 200;
-const SCROLL_SMOOTHNESS = 0.1;
-const HEADER_HEIGHT = 50;
-// Paramètres pour l'animation
-const INITIAL_SIZE = 50;
-const MIN_SQUASH = 0.5;
-const MAX_SQUASH_WIDTH = 1.8;
-const MAX_STRETCH = 1.5;
-const STILL_TIME_THRESHOLD = 60;
-// Paramètres pour la rotation
-const MIN_ROTATIONS = 3;
-const ROTATION_SPEED = 0.3;
-
-const BOTTOM_MARGIN = 10; // Marge en bas de l'écran pour la plateforme la plus basse
-
-const CANVA_W = 400;
-const CANVA_H = 700;
-const CANVA_BGCOLOR = 220;
+let playerImg;
+let menuVisible = false;
+let heroImages = [];
+let selectedHeroIndex = 0;
+let menuTargetX = CANVA_W; // Maintenant CANVA_W est défini avant
+let menuCurrentX = CANVA_W;
+let menuSelectedIndex = 0;
 
 function preload() {
-  playerImg = loadImage('images/hero-1.png'); // Load the player image
+  heroImages[0] = loadImage('images/hero-1.png');
+  heroImages[1] = loadImage('images/hero-2.png');
+  heroImages[2] = loadImage('images/hero-3.png');
+  playerImg = heroImages[selectedHeroIndex];
 }
 
 function setup() {
@@ -76,6 +82,9 @@ function draw() {
   textAlign(LEFT);
   text(`Score: ${score}`, 10, 30);
   displayLives();
+  
+  menuCurrentX += (menuTargetX - menuCurrentX) * 0.2;
+  drawMenu();
 }
 
 function updatePlayer() {
@@ -138,21 +147,36 @@ function displayGame() {
            player.y + player.currentH/2 + player.shakeOffset);
   rotate(player.rotation);
   imageMode(CENTER);
-  image(playerImg, 0, 0, player.currentW, player.currentH); // Draw the player image
+  image(playerImg, 0, 0, player.currentW, player.currentH);
   pop();
 }
 
 function keyPressed() {
-  if (key === ' ' && player.canJump) { // Vérifie si le joueur peut sauter
+  if (key === ' ' && player.canJump) {
     isCharging = true;
-    player.canJump = false; // Désactive le saut jusqu'à l'atterrissage
+    player.canJump = false;
   }
   if (key === 'r' || key === 'R') {
     resetGame();
   }
+  if (key === 'm' || key === 'M') {
+    menuVisible = !menuVisible;
+    menuTargetX = menuVisible ? CANVA_W - 150 : CANVA_W;
+  }
+  if (menuVisible) {
+    if (keyCode === UP_ARROW) {
+      menuSelectedIndex = max(0, menuSelectedIndex - 1);
+    } else if (keyCode === DOWN_ARROW) {
+      menuSelectedIndex = min(2, menuSelectedIndex + 1);
+    } else if (keyCode === ENTER) {
+      selectedHeroIndex = menuSelectedIndex;
+      playerImg = heroImages[selectedHeroIndex];
+      menuVisible = false;
+      menuTargetX = CANVA_W;
+    }
+  }
 }
 
-// Modifier keyReleased pour supprimer la condition sur canJump
 function keyReleased() {
   if (key === ' ') {
     isCharging = false;
@@ -162,6 +186,22 @@ function keyReleased() {
     player.targetRotation = rotationCount * TWO_PI;
     jumpCharge = 0;
     player.shakeOffset = 0;
+  }
+}
+
+function mousePressed() {
+  if (menuVisible && mouseButton === LEFT) {
+    const itemHeight = 80;
+    for (let i = 0; i < 3; i++) {
+      let y = 70 + i * itemHeight;
+      if (mouseX >= CANVA_W - 140 && mouseX <= CANVA_W - 10 &&
+          mouseY >= y - 10 && mouseY <= y + 60) {
+        selectedHeroIndex = i;
+        playerImg = heroImages[i];
+        menuVisible = false;
+        menuTargetX = CANVA_W;
+      }
+    }
   }
 }
 
@@ -175,8 +215,7 @@ function checkCollisions() {
       player.y = p.y - player.currentH;
       player.velocity = 0;
       player.onPlatform = true;
-      player.canJump = true; // Réactive la possibilité de sauter
-
+      player.canJump = true;
     }
   }
 }
@@ -202,11 +241,10 @@ function scrollPlatforms(targetSpeed) {
     }
   }
   
-  // Filtrer les plateformes et incrémenter le score pour celles qui sortent
   let initialLength = platforms.length;
   platforms = platforms.filter(p => p.y < height);
   if (platforms.length < initialLength) {
-    score += 1000 * (initialLength - platforms.length); // Incrémente de 1000 par plateforme sortie
+    score += 1000 * (initialLength - platforms.length);
   }
 
   if (platforms.length < INITIAL_PLATFORMS) {
@@ -238,7 +276,7 @@ function resetGame() {
     highestPlatform: height,
     onPlatform: true,
     stillTime: 0,
-    canJump: true // Initialisé à true pour permettre le premier saut
+    canJump: true
   };
   
   platforms = [];
@@ -313,5 +351,35 @@ function repositionPlayer() {
   player.x = lowestPlatform.x + (lowestPlatform.w - player.currentW) / 2;
   player.velocity = 0;
   player.onPlatform = true;
-  player.canJump = true; // Réactive le saut après repositionnement
+  player.canJump = true;
+}
+
+function drawMenu() {
+  fill(40, 40, 40);
+  noStroke();
+  rect(menuCurrentX, 0, 150, CANVA_H, 10);
+  
+  if (menuCurrentX < CANVA_W) {
+    fill(255);
+    textSize(20);
+    textAlign(CENTER);
+    text("Choose Hero", menuCurrentX + 75, 30);
+    
+    const itemHeight = 80;
+    for (let i = 0; i < 3; i++) {
+      let y = 70 + i * itemHeight;
+      
+      if (i === menuSelectedIndex) {
+        fill(255, 215, 0);
+        rect(menuCurrentX + 10, y - 10, 130, 70, 5);
+      }
+      
+      imageMode(CENTER);
+      image(heroImages[i], menuCurrentX + 75, y + 25, 50, 50);
+      
+      fill(255);
+      textSize(16);
+      text(`Hero ${i + 1}`, menuCurrentX + 75, y + 60);
+    }
+  }
 }
