@@ -12,11 +12,11 @@ const INITIAL_PLATFORMS = 6;
 const SHAKE_THRESHOLD = 12;
 const TARGET_HEIGHT = 450;
 const MIN_PLATFORM_SPACING = 150;
-// Nouveaux paramètres pour l'animation
-const INITIAL_HEIGHT = 40;
-const INITIAL_WIDTH = 30;
-const MIN_SQUASH = 0.5; // 50% de la hauteur initiale
-const MAX_STRETCH = 1.5; // 150% de la hauteur initiale
+// Paramètres pour l'animation
+const INITIAL_SIZE = 30; // Taille initiale carrée
+const MIN_SQUASH = 0.5;
+const MAX_STRETCH = 1.5;
+const STILL_TIME_THRESHOLD = 60; // Frames avant retour à la forme carrée (1 seconde à 60fps)
 
 function setup() {
   createCanvas(400, 600);
@@ -36,7 +36,7 @@ function draw() {
     } else {
       player.rotation = 0;
       if (player.onPlatform && !isCharging && player.y < TARGET_HEIGHT) {
-        scrollPlatforms(SCROLL_SPEED * 0.5);
+        scrollPlatforms(SCROLL_SPEED * 0.8);
       }
     }
     
@@ -67,31 +67,36 @@ function updatePlayer() {
   if (isCharging) {
     jumpCharge = constrain(jumpCharge + 0.2, 10, 15);
     let squashFactor = map(jumpCharge, 0, 15, 1, MIN_SQUASH);
-    player.currentH = INITIAL_HEIGHT * squashFactor;
-    player.currentW = INITIAL_WIDTH / squashFactor; // Conservation du volume
+    player.currentH = INITIAL_SIZE * squashFactor;
+    player.currentW = INITIAL_SIZE / squashFactor;
     if (jumpCharge > SHAKE_THRESHOLD) {
       player.shakeOffset = random(-map(jumpCharge, SHAKE_THRESHOLD, 15, 1, 5), 
                                  map(jumpCharge, SHAKE_THRESHOLD, 15, 1, 5));
     } else {
       player.shakeOffset = 0;
     }
+    player.stillTime = 0; // Réinitialise le compteur
   } 
   // Animation du stretch pendant le saut
   else if (!player.onPlatform) {
     if (player.velocity < 0) { // Phase ascendante
       let stretchFactor = map(abs(player.velocity), 0, 15, 1, MAX_STRETCH);
-      player.currentH = INITIAL_HEIGHT * stretchFactor;
-      player.currentW = INITIAL_WIDTH / stretchFactor;
+      player.currentH = INITIAL_SIZE * stretchFactor;
+      player.currentW = INITIAL_SIZE / stretchFactor;
     } else { // Phase descendante
       let recoveryFactor = map(player.velocity, 0, 15, 1, MAX_STRETCH);
-      player.currentH = INITIAL_HEIGHT * recoveryFactor;
-      player.currentW = INITIAL_WIDTH / recoveryFactor;
+      player.currentH = INITIAL_SIZE * recoveryFactor;
+      player.currentW = INITIAL_SIZE / recoveryFactor;
     }
-  }
-  // Retour à la normale sur une plateforme
+    player.stillTime = 0;
+  } 
+  // Retour progressif à la forme carrée quand immobile
   else if (!isCharging) {
-    player.currentH += (INITIAL_HEIGHT - player.currentH) * 0.1; // Interpolation douce
-    player.currentW += (INITIAL_WIDTH - player.currentW) * 0.1;
+    player.stillTime++;
+    if (player.stillTime > STILL_TIME_THRESHOLD) {
+      player.currentH += (INITIAL_SIZE - player.currentH) * 0.1;
+      player.currentW += (INITIAL_SIZE - player.currentW) * 0.1;
+    }
   }
   
   player.onPlatform = false;
@@ -172,17 +177,18 @@ function scrollPlatforms(speed) {
 function resetGame() {
   player = {
     x: width/2,
-    y: height - 60,
-    w: INITIAL_WIDTH,          // Stocke la taille initiale
-    h: INITIAL_HEIGHT,
-    currentW: INITIAL_WIDTH,   // Taille actuelle pour l'animation
-    currentH: INITIAL_HEIGHT,
+    y: height - 50, // Ajusté pour la nouvelle taille carrée
+    w: INITIAL_SIZE,
+    h: INITIAL_SIZE,
+    currentW: INITIAL_SIZE,
+    currentH: INITIAL_SIZE,
     velocity: 0,
     rotation: 0,
     shakeOffset: 0,
     lastJumpForce: 0,
     highestPlatform: height,
-    onPlatform: true
+    onPlatform: true,
+    stillTime: 0 // Compteur pour le temps immobile
   };
   
   platforms = [];
