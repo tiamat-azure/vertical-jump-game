@@ -14,9 +14,10 @@ const TARGET_HEIGHT = 450;
 const MIN_PLATFORM_SPACING = 150;
 // Paramètres pour l'animation
 const INITIAL_SIZE = 30; // Taille initiale carrée
-const MIN_SQUASH = 0.5;
+const MIN_SQUASH = 0.5; // Hauteur minimale en proportion
+const MAX_SQUASH_WIDTH = 1.8; // Nouvelle constante : largeur max en proportion de INITIAL_SIZE
 const MAX_STRETCH = 1.5;
-const STILL_TIME_THRESHOLD = 60; // Frames avant retour à la forme carrée (1 seconde à 60fps)
+const STILL_TIME_THRESHOLD = 60;
 
 function setup() {
   createCanvas(400, 600);
@@ -36,7 +37,7 @@ function draw() {
     } else {
       player.rotation = 0;
       if (player.onPlatform && !isCharging && player.y < TARGET_HEIGHT) {
-        scrollPlatforms(SCROLL_SPEED * 0.8);
+        scrollPlatforms(SCROLL_SPEED * 0.5);
       }
     }
     
@@ -60,22 +61,25 @@ function updatePlayer() {
   if (keyIsDown(RIGHT_ARROW)) player.x += 5;
   player.x = constrain(player.x, 0, width - player.currentW);
   
-  player.velocity += gravity;
-  player.y += player.velocity;
+  // Appliquer la gravité seulement si pas sur une plateforme
+  if (!player.onPlatform || isCharging) {
+    player.velocity += gravity;
+    player.y += player.velocity;
+  }
   
   // Animation du squash pendant la charge
   if (isCharging) {
     jumpCharge = constrain(jumpCharge + 0.2, 10, 15);
     let squashFactor = map(jumpCharge, 0, 15, 1, MIN_SQUASH);
     player.currentH = INITIAL_SIZE * squashFactor;
-    player.currentW = INITIAL_SIZE / squashFactor;
+    player.currentW = INITIAL_SIZE * map(squashFactor, 1, MIN_SQUASH, 1, MAX_SQUASH_WIDTH);
     if (jumpCharge > SHAKE_THRESHOLD) {
       player.shakeOffset = random(-map(jumpCharge, SHAKE_THRESHOLD, 15, 1, 5), 
                                  map(jumpCharge, SHAKE_THRESHOLD, 15, 1, 5));
     } else {
       player.shakeOffset = 0;
     }
-    player.stillTime = 0; // Réinitialise le compteur
+    player.stillTime = 0;
   } 
   // Animation du stretch pendant le saut
   else if (!player.onPlatform) {
@@ -158,6 +162,13 @@ function checkCollisions() {
 function scrollPlatforms(speed) {
   for (let p of platforms) {
     p.y += speed;
+    // Si le joueur est sur cette plateforme, le déplacer avec elle
+    if (player.onPlatform && 
+        player.y + player.currentH === p.y && 
+        player.x + player.currentW > p.x && 
+        player.x < p.x + p.w) {
+      player.y += speed;
+    }
   }
   
   platforms = platforms.filter(p => p.y < height);
@@ -177,7 +188,7 @@ function scrollPlatforms(speed) {
 function resetGame() {
   player = {
     x: width/2,
-    y: height - 50, // Ajusté pour la nouvelle taille carrée
+    y: height - 50,
     w: INITIAL_SIZE,
     h: INITIAL_SIZE,
     currentW: INITIAL_SIZE,
@@ -188,7 +199,7 @@ function resetGame() {
     lastJumpForce: 0,
     highestPlatform: height,
     onPlatform: true,
-    stillTime: 0 // Compteur pour le temps immobile
+    stillTime: 0
   };
   
   platforms = [];
