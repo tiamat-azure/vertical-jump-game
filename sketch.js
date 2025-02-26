@@ -5,10 +5,10 @@ let jumpCharge = 0;
 let isCharging = false;
 let score = 0;
 let gameOver = false;
-let lives = 3; // Initial number of lives
+let lives = 3;
 
 // Paramètres configurables
-const SCROLL_SPEED = 6;
+const SCROLL_SPEED = 8;
 const INITIAL_PLATFORMS = 6;
 const SHAKE_THRESHOLD = 12;
 const TARGET_HEIGHT = 450;
@@ -22,8 +22,10 @@ const MAX_SQUASH_WIDTH = 1.8;
 const MAX_STRETCH = 1.5;
 const STILL_TIME_THRESHOLD = 60;
 // Paramètres pour la rotation
-const MIN_ROTATIONS = 1; // Nombre minimum de rotations pleines
-const ROTATION_SPEED = 0.3; // Vitesse de rotation par frame (ajustable)
+const MIN_ROTATIONS = 1;
+const ROTATION_SPEED = 0.3;
+
+const BOTTOM_MARGIN = 10; // Marge en bas de l'écran pour la plateforme la plus basse
 
 const CANVA_W = 400;
 const CANVA_H = 700;
@@ -43,14 +45,9 @@ function draw() {
     
     if (player.velocity < 0) {
       scrollPlatforms(SCROLL_SPEED);
-      // Rotation uniquement pendant la phase ascendante
       player.rotation += ROTATION_SPEED;
     } else if (player.onPlatform) {
-      // S'assurer que la rotation est un multiple de 2PI à l'atterrissage
       player.rotation = 0;
-      if (!isCharging && player.y < TARGET_HEIGHT) {
-        scrollPlatforms(SCROLL_SPEED * 0.5);
-      }
     }
     
     displayGame();
@@ -73,7 +70,7 @@ function draw() {
   textSize(20);
   textAlign(LEFT);
   text(`Score: ${score}`, 10, 30);
-  displayLives(); // Display lives in the header
+  displayLives();
 }
 
 function updatePlayer() {
@@ -126,6 +123,7 @@ function displayGame() {
   for (let p of platforms) {
     if (p.y + p.h > HEADER_HEIGHT) {
       fill(0, 255, 0);
+      noStroke();
       rect(p.x, p.y, p.w, p.h);
     }
   }
@@ -135,27 +133,29 @@ function displayGame() {
            player.y + player.currentH/2 + player.shakeOffset);
   rotate(player.rotation);
   fill(255, 165, 0);
+  noStroke();
   rect(-player.currentW/2, -player.currentH/2, player.currentW, player.currentH);
   pop();
 }
 
 function keyPressed() {
-  if (key === ' ') {
+  if (key === ' ' && player.canJump) { // Vérifie si le joueur peut sauter
     isCharging = true;
+    player.canJump = false; // Désactive le saut jusqu'à l'atterrissage
   }
   if (key === 'r' || key === 'R') {
     resetGame();
   }
 }
 
+// Modifier keyReleased pour supprimer la condition sur canJump
 function keyReleased() {
   if (key === ' ') {
     isCharging = false;
     player.velocity = -jumpCharge;
     player.lastJumpForce = jumpCharge;
-    // Calculer le nombre total de rotations basé sur jumpCharge
-    let rotationCount = MIN_ROTATIONS + floor(map(jumpCharge, 10, 15, 0, 2)); // 0 à 2 rotations supplémentaires
-    player.targetRotation = rotationCount * TWO_PI; // Rotation cible en radians
+    let rotationCount = MIN_ROTATIONS + floor(map(jumpCharge, 10, 15, 0, 2));
+    player.targetRotation = rotationCount * TWO_PI;
     jumpCharge = 0;
     player.shakeOffset = 0;
   }
@@ -171,6 +171,7 @@ function checkCollisions() {
       player.y = p.y - player.currentH;
       player.velocity = 0;
       player.onPlatform = true;
+      player.canJump = true; // Réactive la possibilité de sauter
       
       if (p.y < player.highestPlatform) {
         score += 1000;
@@ -181,17 +182,23 @@ function checkCollisions() {
 }
 
 function scrollPlatforms(targetSpeed) {
-  for (let p of platforms) {
-    if (!p.currentSpeed) p.currentSpeed = 0;
-    
-    p.currentSpeed += (targetSpeed - p.currentSpeed) * SCROLL_SMOOTHNESS;
-    p.y += p.currentSpeed;
-    
-    if (player.onPlatform && 
-        player.y + player.currentH === p.y && 
-        player.x + player.currentW > p.x && 
-        player.x < p.x + p.w) {
-      player.y += p.currentSpeed;
+  let platformsBelow = platforms.filter(p => 
+    p.y + p.h > HEADER_HEIGHT && p.y >= (player.onPlatform ? player.y : player.y + player.currentH)
+  ).length;
+  
+  if (player.velocity < 0 && platformsBelow > 2) {
+    for (let p of platforms) {
+      if (!p.currentSpeed) p.currentSpeed = 0;
+      
+      p.currentSpeed += (targetSpeed - p.currentSpeed) * SCROLL_SMOOTHNESS;
+      p.y += p.currentSpeed;
+      
+      if (player.onPlatform && 
+          player.y + player.currentH === p.y && 
+          player.x + player.currentW > p.x && 
+          player.x < p.x + p.w) {
+        player.y += p.currentSpeed;
+      }
     }
   }
   
@@ -220,12 +227,13 @@ function resetGame() {
     currentH: INITIAL_SIZE,
     velocity: 0,
     rotation: 0,
-    targetRotation: 0, // Ajout de la rotation cible
+    targetRotation: 0,
     shakeOffset: 0,
     lastJumpForce: 0,
     highestPlatform: height,
     onPlatform: true,
-    stillTime: 0
+    stillTime: 0,
+    canJump: true // Initialisé à true pour permettre le premier saut
   };
   
   platforms = [];
@@ -250,11 +258,12 @@ function resetGame() {
   
   score = 0;
   gameOver = false;
-  lives = 3; // Reset lives
+  lives = 3;
 }
 
 function displayGameOver() {
   fill(0);
+  noStroke();
   textSize(40);
   textAlign(CENTER);
   text("Game Over", width/2, height/2);
@@ -264,28 +273,40 @@ function displayGameOver() {
 
 function displayLives() {
   const heartSize = 20;
+  const heartSpacing = 10;
+  const totalWidth = 3 * heartSize + 2 * heartSpacing;
+  const startX = (width - totalWidth) / 2;
+  
   for (let i = 0; i < 3; i++) {
+    let x = startX + i * (heartSize + heartSpacing);
+    let y = 15;
+    
+    noFill();
+    stroke(255, 0, 0);
+    strokeWeight(2);
     if (i < lives) {
       fill(255, 0, 0);
-    } else {
-      noFill();
-      stroke(255, 0, 0);
     }
     beginShape();
-    vertex(50 + i * (heartSize + 10), 20);
-    bezierVertex(50 + i * (heartSize + 10) - heartSize / 2, 20 - heartSize / 2, 
-                 50 + i * (heartSize + 10) - heartSize, 20 + heartSize / 3, 
-                 50 + i * (heartSize + 10), 20 + heartSize);
-    bezierVertex(50 + i * (heartSize + 10) + heartSize, 20 + heartSize / 3, 
-                 50 + i * (heartSize + 10) + heartSize / 2, 20 - heartSize / 2, 
-                 50 + i * (heartSize + 10), 20);
+    vertex(x, y);
+    bezierVertex(x - heartSize / 2, y - heartSize / 2, 
+                 x - heartSize, y + heartSize / 3, 
+                 x, y + heartSize);
+    bezierVertex(x + heartSize, y + heartSize / 3, 
+                 x + heartSize / 2, y - heartSize / 2, 
+                 x, y);
     endShape(CLOSE);
+    noStroke();
   }
 }
 
 function repositionPlayer() {
-  let lowestPlatform = platforms.reduce((lowest, p) => p.y > lowest.y ? p : lowest, platforms[0]);
+  let lowestPlatform = platforms.reduce((lowest, p) => 
+    (p.y + p.h > HEADER_HEIGHT && p.y > lowest.y) ? p : lowest, 
+    platforms.filter(p => p.y + p.h > HEADER_HEIGHT)[0] || platforms[0]);
   player.y = lowestPlatform.y - player.currentH;
+  player.x = lowestPlatform.x + (lowestPlatform.w - player.currentW) / 2;
   player.velocity = 0;
   player.onPlatform = true;
+  player.canJump = true; // Réactive le saut après repositionnement
 }
