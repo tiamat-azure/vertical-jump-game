@@ -12,17 +12,17 @@ const SCROLL_SPEED = 8;
 const INITIAL_PLATFORMS = 6;
 const SHAKE_THRESHOLD = 12;
 const TARGET_HEIGHT = 450;
-const MIN_PLATFORM_SPACING = 150;
+const MIN_PLATFORM_SPACING = 200;
 const SCROLL_SMOOTHNESS = 0.1;
 const HEADER_HEIGHT = 50;
 // Paramètres pour l'animation
-const INITIAL_SIZE = 30;
+const INITIAL_SIZE = 50;
 const MIN_SQUASH = 0.5;
 const MAX_SQUASH_WIDTH = 1.8;
 const MAX_STRETCH = 1.5;
 const STILL_TIME_THRESHOLD = 60;
 // Paramètres pour la rotation
-const MIN_ROTATIONS = 1;
+const MIN_ROTATIONS = 3;
 const ROTATION_SPEED = 0.3;
 
 const BOTTOM_MARGIN = 10; // Marge en bas de l'écran pour la plateforme la plus basse
@@ -172,10 +172,15 @@ function checkCollisions() {
       player.velocity = 0;
       player.onPlatform = true;
       player.canJump = true; // Réactive la possibilité de sauter
-      // L'incrémentation du score est supprimée ici
+      
+      if (p.y < player.highestPlatform) {
+        score += 1000;
+        player.highestPlatform = p.y;
+      }
     }
   }
 }
+
 function scrollPlatforms(targetSpeed) {
   let platformsBelow = platforms.filter(p => 
     p.y + p.h > HEADER_HEIGHT && p.y >= (player.onPlatform ? player.y : player.y + player.currentH)
@@ -197,12 +202,7 @@ function scrollPlatforms(targetSpeed) {
     }
   }
   
-  // Filtrer les plateformes et incrémenter le score pour celles qui sortent
-  let initialLength = platforms.length;
   platforms = platforms.filter(p => p.y < height);
-  if (platforms.length < initialLength) {
-    score += 1000 * (initialLength - platforms.length); // Incrémente de 1000 par plateforme sortie
-  }
   
   if (platforms.length < INITIAL_PLATFORMS) {
     let lastY = platforms.length > 0 ? platforms[platforms.length-1].y : height;
