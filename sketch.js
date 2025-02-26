@@ -1,4 +1,4 @@
-// Déplacer les constantes avant les variables globales qui en dépendent
+// Constantes configurables (déclarées en premier pour éviter TDZ)
 const CANVA_W = 400;
 const CANVA_H = 700;
 const CANVA_BGCOLOR = 220;
@@ -19,6 +19,30 @@ const MIN_ROTATIONS = 3;
 const ROTATION_SPEED = 0.3;
 const BOTTOM_MARGIN = 10;
 
+// Classe Player (définie avant son utilisation)
+class Player {
+  constructor(name, image) {
+    this.name = name;
+    this.image = image;
+    this.x = CANVA_W / 2;
+    this.y = CANVA_H - 50;
+    this.w = INITIAL_SIZE;
+    this.h = INITIAL_SIZE;
+    this.currentW = INITIAL_SIZE;
+    this.currentH = INITIAL_SIZE;
+    this.velocity = 0;
+    this.rotation = 0;
+    this.targetRotation = 0;
+    this.shakeOffset = 0;
+    this.lastJumpForce = 0;
+    this.highestPlatform = CANVA_H;
+    this.onPlatform = true;
+    this.stillTime = 0;
+    this.canJump = true;
+  }
+}
+
+// Variables globales (déclarées après les constantes et la classe)
 let player;
 let platforms = [];
 let gravity = 0.5;
@@ -31,15 +55,15 @@ let playerImg;
 let menuVisible = false;
 let heroImages = [];
 let selectedHeroIndex = 0;
-let menuTargetX = CANVA_W; // Maintenant CANVA_W est défini avant
+let menuTargetX = CANVA_W;
 let menuCurrentX = CANVA_W;
 let menuSelectedIndex = 0;
 
 function preload() {
-  heroImages[0] = loadImage('images/hero-1.png');
-  heroImages[1] = loadImage('images/hero-2.png');
-  heroImages[2] = loadImage('images/hero-3.png');
-  playerImg = heroImages[selectedHeroIndex];
+  heroImages[0] = { name: "Lysaria", img: loadImage('images/hero-1.png') };
+  heroImages[1] = { name: "Kaelrik", img: loadImage('images/hero-2.png') };
+  heroImages[2] = { name: "Seraphine", img: loadImage('images/hero-3.png') };
+  playerImg = heroImages[selectedHeroIndex].img;
 }
 
 function setup() {
@@ -147,7 +171,13 @@ function displayGame() {
            player.y + player.currentH/2 + player.shakeOffset);
   rotate(player.rotation);
   imageMode(CENTER);
-  image(playerImg, 0, 0, player.currentW, player.currentH);
+  if (playerImg) {
+    image(playerImg, 0, 0, player.currentW, player.currentH);
+  } else {
+    fill(255, 165, 0);
+    noStroke();
+    rect(-player.currentW/2, -player.currentH/2, player.currentW, player.currentH);
+  }
   pop();
 }
 
@@ -170,7 +200,8 @@ function keyPressed() {
       menuSelectedIndex = min(2, menuSelectedIndex + 1);
     } else if (keyCode === ENTER) {
       selectedHeroIndex = menuSelectedIndex;
-      playerImg = heroImages[selectedHeroIndex];
+      playerImg = heroImages[selectedHeroIndex].img;
+      player.name = heroImages[selectedHeroIndex].name;
       menuVisible = false;
       menuTargetX = CANVA_W;
     }
@@ -197,7 +228,8 @@ function mousePressed() {
       if (mouseX >= CANVA_W - 140 && mouseX <= CANVA_W - 10 &&
           mouseY >= y - 10 && mouseY <= y + 60) {
         selectedHeroIndex = i;
-        playerImg = heroImages[i];
+        playerImg = heroImages[i].img;
+        player.name = heroImages[i].name;
         menuVisible = false;
         menuTargetX = CANVA_W;
       }
@@ -261,28 +293,12 @@ function scrollPlatforms(targetSpeed) {
 }
 
 function resetGame() {
-  player = {
-    x: width/2,
-    y: height - 50,
-    w: INITIAL_SIZE,
-    h: INITIAL_SIZE,
-    currentW: INITIAL_SIZE,
-    currentH: INITIAL_SIZE,
-    velocity: 0,
-    rotation: 0,
-    targetRotation: 0,
-    shakeOffset: 0,
-    lastJumpForce: 0,
-    highestPlatform: height,
-    onPlatform: true,
-    stillTime: 0,
-    canJump: true
-  };
+  player = new Player(heroImages[selectedHeroIndex].name, heroImages[selectedHeroIndex].img);
   
   platforms = [];
   platforms.push({
-    x: width/2 - 50,
-    y: height - 20,
+    x: CANVA_W / 2 - 50,
+    y: CANVA_H - 20,
     w: 100,
     h: 20,
     currentSpeed: 0
@@ -291,7 +307,7 @@ function resetGame() {
   for (let i = 1; i < INITIAL_PLATFORMS; i++) {
     let lastY = platforms[i-1].y;
     platforms.push({
-      x: random(0, width-100),
+      x: random(0, CANVA_W - 100),
       y: lastY - random(MIN_PLATFORM_SPACING, 100),
       w: 100,
       h: 20,
@@ -375,11 +391,16 @@ function drawMenu() {
       }
       
       imageMode(CENTER);
-      image(heroImages[i], menuCurrentX + 75, y + 25, 50, 50);
+      if (heroImages[i] && heroImages[i].img) {
+        image(heroImages[i].img, menuCurrentX + 75, y + 25, 50, 50);
+      } else {
+        fill(150);
+        rect(menuCurrentX + 75 - 25, y + 25 - 25, 50, 50);
+      }
       
       fill(255);
       textSize(16);
-      text(`Hero ${i + 1}`, menuCurrentX + 75, y + 60);
+      text(heroImages[i].name, menuCurrentX + 75, y + 60);
     }
   }
 }
